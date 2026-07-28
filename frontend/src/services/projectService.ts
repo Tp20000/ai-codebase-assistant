@@ -1,9 +1,10 @@
-﻿/**
- * Project API Service - Step 42
- * AI Codebase Assistant v2.0
+/**
+ * Project API Service - AI Codebase Assistant v2.0
  */
 
-import { apiGet, apiPost, apiDelete } from "@/services/api";
+import axios from "axios";
+import { apiGet, apiPost, apiClient } from "@/services/api";
+import { STORAGE_KEYS } from "@/utils/constants";
 
 export interface Project {
   id: string;
@@ -17,6 +18,7 @@ export interface Project {
   owner_id: string;
   chunk_count?: number;
   index_status?: "not_started" | "in_progress" | "completed" | "failed";
+  status?: string;
 }
 
 export interface CreateProjectPayload {
@@ -32,15 +34,10 @@ export interface ProjectListResponse {
   per_page: number;
 }
 
-/**
- * Fetch all projects. Uses trailing slash to avoid 307 redirect
- * which drops Authorization header in some HTTP clients.
- */
 export async function fetchProjects(
   page = 1,
   perPage = 20
 ): Promise<ProjectListResponse> {
-  // Use trailing slash to match FastAPI route directly (avoids 307 redirect)
   const raw = await apiGet<Project[] | ProjectListResponse>("/projects/", {
     page,
     per_page: perPage,
@@ -48,7 +45,6 @@ export async function fetchProjects(
   if (Array.isArray(raw)) {
     return { items: raw, total: raw.length, page: 1, per_page: raw.length };
   }
-  // Handle both {items, total} and direct array response shapes
   if ("items" in raw) return raw as ProjectListResponse;
   return { items: [], total: 0, page: 1, per_page: perPage };
 }
@@ -59,12 +55,33 @@ export async function createProject(
   return apiPost<Project>("/projects/", payload);
 }
 
+/**
+ * Delete a project by ID.
+ * Uses direct backend URL to bypass Vite proxy trailing slash bug.
+ * In production, uses the normal API client.
+ */
 export async function deleteProject(projectId: string): Promise<void> {
-  return apiDelete<void>(`/projects/${projectId}/`);
+  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  const headers = { Authorization: `Bearer ${token ?? ""}` };
+
+  // Detect if running in local dev (Vite proxy) or production
+  const isDev = window.location.port === "5173";
+
+  if (isDev) {
+    // Bypass Vite proxy — call backend directly on port 8000
+    await axios.delete(
+      `http://localhost:8000/api/v1/projects/${projectId}`,
+      { headers }
+    );
+  } else {
+    // Production — use normal API client
+    await apiClient.delete(`/projects/${projectId}`);
+  }
 }
 
 export async function fetchHealth(): Promise<Record<string, unknown>> {
-  return apiGet<Record<string, unknown>>("/health");
+  const raw = await apiGet<Record<string, unknown>>("/health");
+  return raw;
 }
 
 export function getLanguageIcon(language: string): string {

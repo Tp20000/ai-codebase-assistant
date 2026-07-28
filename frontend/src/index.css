@@ -1,0 +1,174 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================================================================
+   CSS Custom Properties - Dark Theme (default)
+   ================================================================ */
+:root {
+  --bg-primary:     #0d1117;
+  --bg-secondary:   #161b22;
+  --bg-tertiary:    #21262d;
+  --bg-hover:       #30363d;
+  --border:         #30363d;
+  --border-focus:   #3B82F6;
+  --text-primary:   #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted:     #484f58;
+  --accent-blue:    #3B82F6;
+  --accent-purple:  #8B5CF6;
+  --accent-green:   #10B981;
+  --accent-red:     #EF4444;
+  --accent-amber:   #F59E0B;
+  --scrollbar-track: #161b22;
+  --scrollbar-thumb: #30363d;
+}
+
+/* Light Theme Override */
+.light {
+  --bg-primary:     #ffffff;
+  --bg-secondary:   #f6f8fa;
+  --bg-tertiary:    #eaeef2;
+  --bg-hover:       #d0d7de;
+  --border:         #d0d7de;
+  --border-focus:   #3B82F6;
+  --text-primary:   #1f2328;
+  --text-secondary: #57606a;
+  --text-muted:     #8c959f;
+  --scrollbar-track: #f6f8fa;
+  --scrollbar-thumb: #d0d7de;
+}
+
+/* ================================================================
+   Base Styles
+   ================================================================ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ================================================================
+   Scrollbar Styling
+   ================================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ================================================================
+   Focus + Selection
+   ================================================================ */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: var(--text-primary);
+}
+
+/* ================================================================
+   Utility Classes (plain CSS - no @apply with custom Tailwind classes)
+   ================================================================ */
+.glass {
+  background: rgba(22, 27, 34, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+.light .glass {
+  background: rgba(246, 248, 250, 0.8);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ================================================================
+   Code Syntax
+   ================================================================ */
+code, pre {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+pre {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+/* ================================================================
+   Animations
+   ================================================================ */
+.animate-fade-in { animation: fadeIn 0.15s ease-out; }
+.animate-slide-up { animation: slideUp 0.2s ease-out; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================================
+   Prose (markdown rendering)
+   ================================================================ */
+.prose {
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+.prose h1, .prose h2, .prose h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+.prose p { margin: 0.75em 0; }
+.prose code {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  color: var(--accent-green);
+}
+.prose a { color: var(--accent-blue); text-decoration: none; }
+.prose a:hover { text-decoration: underline; }
+.prose ul, .prose ol { padding-left: 1.5em; margin: 0.5em 0; }
+.prose blockquote {
+  border-left: 3px solid var(--accent-blue);
+  padding-left: 1em;
+  color: var(--text-secondary);
+  margin: 1em 0;
+}

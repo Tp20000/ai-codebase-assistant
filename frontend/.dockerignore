@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+.git
+.gitignore
+*.md
+.env
+.env.*
+!.env.example
+tests
+test-results
+playwright-report
+.vscode
+.idea
+coverage

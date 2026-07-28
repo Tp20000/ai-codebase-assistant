@@ -1,0 +1,17 @@
+# AI Codebase Assistant v2.0 — Code Owners
+# These owners are automatically requested for review on PRs
+
+# Global owner
+* @your-github-username
+
+# Backend
+/backend/ @your-github-username
+/backend/app/core/ @your-github-username
+
+# Frontend
+/frontend/src/ @your-github-username
+
+# Infrastructure
+/docker-compose*.yml @your-github-username
+/.github/ @your-github-username
+/scripts/ @your-github-username

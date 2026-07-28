@@ -8,6 +8,8 @@ Pattern: Amazon/Google internal auth services use asymmetric JWTs so
 
 import uuid
 import logging
+import base64
+import binascii
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -79,7 +81,7 @@ def ensure_keys_exist() -> None:
 def load_private_key() -> bytes:
     """Load private key PEM bytes from disk or environment variable."""
     if settings.JWT_PRIVATE_KEY:
-        return settings.JWT_PRIVATE_KEY.encode()
+        return _normalize_env_pem(settings.JWT_PRIVATE_KEY)
     ensure_keys_exist()
     return PRIVATE_KEY_PATH.read_bytes()
 
@@ -87,9 +89,25 @@ def load_private_key() -> bytes:
 def load_public_key() -> bytes:
     """Load public key PEM bytes from disk or environment variable."""
     if settings.JWT_PUBLIC_KEY:
-        return settings.JWT_PUBLIC_KEY.encode()
+        return _normalize_env_pem(settings.JWT_PUBLIC_KEY)
     ensure_keys_exist()
     return PUBLIC_KEY_PATH.read_bytes()
+
+
+def _normalize_env_pem(value: str) -> bytes:
+    """Support PEM text and base64-encoded PEM values from environment variables."""
+    key_text = value.strip()
+    if "-----BEGIN" in key_text:
+        return key_text.encode()
+
+    try:
+        decoded = base64.b64decode(key_text, validate=True)
+        if b"-----BEGIN" in decoded:
+            return decoded
+    except (ValueError, binascii.Error):
+        pass
+
+    return key_text.encode()
 
 
 # ─────────────────────────────────────────────

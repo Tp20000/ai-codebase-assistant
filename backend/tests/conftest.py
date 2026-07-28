@@ -17,15 +17,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
+from app.config import settings
 from app.main import app
 from app.database import get_db
 from app.utils.password import hash_password
 from app.utils.jwt_handler import create_access_token
 
-TEST_DB_URL = (
-    "postgresql+asyncpg://aiassistant:aiassistant_secret"
-    "@postgres:5432/ai_codebase_db"
-)
+TEST_DB_URL = settings.DATABASE_URL
 
 def _make_engine():
     return create_async_engine(TEST_DB_URL, poolclass=NullPool, echo=False)

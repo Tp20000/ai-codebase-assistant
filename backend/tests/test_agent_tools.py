@@ -106,8 +106,19 @@ class TestBaseAgentContract:
         parent = cls if cls is not None else object
 
         class FakeAgent(parent):
+            @property
+            def agent_type(self):
+                return "fake_agent"
+
             def __init__(self, llm):
                 self.llm = llm
+
+            def _build_graph(self):
+                return None
+
+            def _format_result(self, state):
+                return {}
+
             async def run(self, source):
                 response = await self.llm.generate(f"Analyze:\n{source}")
                 return {"agent_type": "fake_agent", "status": "completed", "summary": response}

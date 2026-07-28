@@ -1,6 +1,5 @@
-﻿/**
- * Root Application - Steps 40-43
- * AI Codebase Assistant v2.0
+/**
+ * Root Application - AI Codebase Assistant v2.0
  */
 
 import { Suspense, lazy } from "react";
@@ -15,6 +14,7 @@ import { useAuthStore } from "@/stores/authStore";
 const Login            = lazy(() => import("@/pages/auth/Login"));
 const Register         = lazy(() => import("@/pages/auth/Register"));
 const Dashboard        = lazy(() => import("@/pages/Dashboard"));
+const Projects         = lazy(() => import("@/pages/Projects"));
 const ProjectWorkspace = lazy(() => import("@/pages/ProjectWorkspace"));
 const Analytics        = lazy(() => import("@/pages/Analytics"));
 const Settings         = lazy(() => import("@/pages/Settings"));
@@ -69,7 +69,17 @@ export function App() {
                 }
               />
 
-              {/* Project Workspace — NO AppLayout (full screen workspace) */}
+              {/* Projects List Page */}
+              <Route
+                path="/projects"
+                element={
+                  <RequireAuth>
+                    <AppLayout><Projects /></AppLayout>
+                  </RequireAuth>
+                }
+              />
+
+              {/* Project Workspace — full screen, no AppLayout */}
               <Route
                 path="/projects/:id"
                 element={
@@ -81,7 +91,7 @@ export function App() {
                 }
               />
 
-              {/* Other pages */}
+              {/* Analytics */}
               <Route
                 path="/analytics"
                 element={
@@ -90,6 +100,8 @@ export function App() {
                   </RequireAuth>
                 }
               />
+
+              {/* Settings */}
               <Route
                 path="/settings"
                 element={

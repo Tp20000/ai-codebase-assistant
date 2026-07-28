@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Dashboard Page - Step 42
  * AI Codebase Assistant v2.0
  */
@@ -18,9 +18,7 @@ import { Card, CardHeader, CardBody, CardFooter } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton, StatCardSkeleton, ProjectCardSkeleton } from "@/components/ui/Skeleton";
 import {
-  fetchProjects,
-  fetchHealth,
-  createProject,
+  fetchProjects, fetchHealth, createProject, deleteProject,
   getLanguageIcon,
   formatRelativeTime,
   type Project,

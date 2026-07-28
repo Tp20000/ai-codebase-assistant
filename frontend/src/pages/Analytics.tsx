@@ -217,7 +217,7 @@ export default function Analytics() {
             <Badge variant="default">📊 Avg CC: {avgCC}</Badge>
           )}
           {Boolean(graphData?.metadata) && (
-            <Badge variant="default">🔗 {(graphData.metadata as { total_edges: number }).total_edges} deps</Badge>
+            <Badge variant="default">🔗 {(graphData?.metadata as { total_edges: number } | undefined)?.total_edges ?? 0} deps</Badge>
           )}
         </div>
       )}
@@ -240,10 +240,10 @@ export default function Analytics() {
             <div className="h-full flex items-center justify-center bg-[var(--bg-secondary)]">
               <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
             </div>
-          ) : graphData && (graphData.nodes as unknown[]).length > 0 ? (
+          ) : graphData && (graphData?.nodes as unknown[]).length > 0 ? (
             <DependencyGraph
-              nodes={graphData.nodes as never}
-              edges={graphData.edges as never}
+              nodes={graphData?.nodes as never}
+              edges={graphData?.edges as never}
               metadata={graphData.metadata as never}
             />
           ) : (

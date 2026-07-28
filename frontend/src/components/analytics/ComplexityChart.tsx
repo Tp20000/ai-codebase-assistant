@@ -95,10 +95,10 @@ export function ComplexityChart({
               fontSize: 12,
               color: "#e6edf3",
             }}
-            formatter={(value: unknown, _: unknown, props: { payload: { fullPath: string; grade: string } }) => [
+            formatter={((value: unknown, _: unknown, props: { payload?: { fullPath: string; grade: string } }) => [
               `${value} (Grade ${props.payload.grade})`,
               labels[metric],
-            ]}
+            ]) as never}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
             {chartData.map((entry, index) => (

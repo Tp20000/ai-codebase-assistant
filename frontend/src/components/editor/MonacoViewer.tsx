@@ -139,7 +139,7 @@ export function MonacoViewer({
   className,
 }: MonacoViewerProps) {
   const { theme } = useUIStore();
-  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,7 +154,7 @@ export function MonacoViewer({
     const monaco = monacoRef.current;
     if (!editor || !monaco || highlights.length === 0) return;
 
-    const newDecorations: MonacoEditor.IModelDeltaDecoration[] = highlights.map(
+    const newDecorations: editor.IModelDeltaDecoration[] = highlights.map(
       (h) => {
         const color = HIGHLIGHT_COLORS[h.type ?? "info"];
         return {

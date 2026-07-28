@@ -22,9 +22,10 @@ from app.database import get_db
 from app.utils.password import hash_password
 from app.utils.jwt_handler import create_access_token
 
-TEST_DB_URL = (
-    "postgresql+asyncpg://aiassistant:aiassistant_secret"
-    "@postgres:5432/ai_codebase_db"
+import os
+TEST_DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://aiassistant:aiassistant_secret@postgres:5432/ai_codebase_db"
 )
 
 def _make_engine():
@@ -61,7 +62,7 @@ def _build_token(user) -> str:
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Fresh DB session per test â€” rolled back after each test."""
+    """Fresh DB session per test ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â rolled back after each test."""
     engine = _make_engine()
     factory = _make_session_factory(engine)
     async with factory() as session:

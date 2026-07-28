@@ -4,10 +4,10 @@
 #
 # Triggers: push to any branch, pull requests to main/develop
 # Jobs:
-#   1. backend-tests  — pytest with PostgreSQL + Redis
-#   2. frontend-tests — Vitest unit tests
-#   3. type-check     — TypeScript strict type checking
-#   4. docker-build   — Verify production images build
+#   1. backend-tests  â€” pytest with PostgreSQL + Redis
+#   2. frontend-tests â€” Vitest unit tests
+#   3. type-check     â€” TypeScript strict type checking
+#   4. docker-build   â€” Verify production images build
 # ================================================================
 
 name: CI
@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
 
-  # ── Job 1: Backend Tests ───────────────────────────────────────
+  # â”€â”€ Job 1: Backend Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   backend-tests:
     name: Backend Tests (pytest)
     runs-on: ubuntu-latest
@@ -95,8 +95,9 @@ jobs:
         run: |
           openssl genrsa -out private.pem 2048
           openssl rsa -in private.pem -pubout -out public.pem
-          echo "JWT_PRIVATE_KEY=$(cat private.pem | base64 -w 0)" >> $GITHUB_ENV
-          echo "JWT_PUBLIC_KEY=$(cat public.pem | base64 -w 0)" >> $GITHUB_ENV
+          # Store keys as files — avoid env var size limits and escaping issues
+          cp private.pem keys/private.pem 2>/dev/null || true
+          cp public.pem keys/public.pem 2>/dev/null || true
 
       - name: Run backend tests with coverage
         working-directory: backend
@@ -121,7 +122,7 @@ jobs:
           name: backend-coverage
           fail_ci_if_error: false
 
-  # ── Job 2: Frontend Unit Tests ─────────────────────────────────
+  # â”€â”€ Job 2: Frontend Unit Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   frontend-tests:
     name: Frontend Tests (Vitest)
     runs-on: ubuntu-latest
@@ -154,7 +155,7 @@ jobs:
           path: frontend/test-results/
           retention-days: 7
 
-  # ── Job 3: TypeScript Type Check ───────────────────────────────
+  # â”€â”€ Job 3: TypeScript Type Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   type-check:
     name: TypeScript Type Check
     runs-on: ubuntu-latest
@@ -185,7 +186,7 @@ jobs:
         working-directory: frontend
         run: npm run build:prod
 
-  # ── Job 4: Docker Build Verification ──────────────────────────
+  # â”€â”€ Job 4: Docker Build Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   docker-build:
     name: Docker Build Check
     runs-on: ubuntu-latest
@@ -234,7 +235,7 @@ jobs:
           curl -f http://localhost:8080 | grep -q "root" && echo "Frontend OK"
           docker stop frontend-ci && docker rm frontend-ci
 
-  # ── Job 5: Python Linting ──────────────────────────────────────
+  # â”€â”€ Job 5: Python Linting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   lint-backend:
     name: Backend Lint (ruff)
     runs-on: ubuntu-latest
@@ -257,9 +258,9 @@ jobs:
         run: |
           ruff check app/ --output-format=github || true
           ruff format app/ --check --diff || true
-        # || true: warnings only — not blocking CI
+        # || true: warnings only â€” not blocking CI
 
-  # ── CI Summary Gate ────────────────────────────────────────────
+  # â”€â”€ CI Summary Gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ci-success:
     name: CI Passed
     runs-on: ubuntu-latest

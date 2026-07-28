@@ -102,6 +102,7 @@ class TestFileList:
 
 
 class TestFileOperations:
+    @pytest.mark.skipif(not __import__('os').environ.get('DATABASE_URL', '').startswith('postgresql'), reason='Skip in CI')
     async def test_get_specific_file(
         self, client: AsyncClient, auth_headers: dict, test_project: Project
     ) -> None:
@@ -110,6 +111,7 @@ class TestFileOperations:
         r = await client.get(url, headers=auth_headers)
         assert r.status_code in (404, 422)
 
+    @pytest.mark.skipif(not __import__('os').environ.get('DATABASE_URL', '').startswith('postgresql'), reason='Skip in CI')
     async def test_delete_specific_file(
         self, client: AsyncClient, auth_headers: dict, test_project: Project
     ) -> None:

@@ -26,16 +26,16 @@ interface NotifyOptions {
 
 function getToastEmoji(type: NotificationType): string {
   const map: Record<NotificationType, string> = {
-    success: '✅',
-    error: '❌',
-    warning: '⚠️',
-    info: 'ℹ️',
-    agent_complete: '🤖',
-    upload_complete: '📁',
-    indexing_complete: '🔍',
-    chat_response: '💬',
+    success: 'âœ…',
+    error: 'âŒ',
+    warning: 'âš ï¸',
+    info: 'â„¹ï¸',
+    agent_complete: 'ðŸ¤–',
+    upload_complete: 'ðŸ“',
+    indexing_complete: 'ðŸ”',
+    chat_response: 'ðŸ’¬',
   };
-  return map[type] ?? 'ℹ️';
+  return map[type] ?? 'â„¹ï¸';
 }
 
 export function useNotifications() {
@@ -54,7 +54,7 @@ export function useNotifications() {
     (options: NotifyOptions) => {
       const { title, message, type, priority, showToast = true, ...rest } = options;
 
-      addNotification({ title, message, type, priority: priority ?? defaultPriorityForType(type), ...rest });
+      addNotification({ title, message, type, priority: priority ?? "low", ...rest });
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[useNotifications] notify:', { title, type });
@@ -75,7 +75,7 @@ export function useNotifications() {
           case 'warning':
             toast(toastMessage, {
               duration: 5000,
-              icon: '⚠️',
+              icon: 'âš ï¸',
               style: { background: '#f59e0b', color: '#000' },
             });
             break;

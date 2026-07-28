@@ -1,8 +1,14 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",
@@ -10,5 +16,17 @@ export default defineConfig({
     css: true,
     restoreMocks: true,
     clearMocks: true,
+    // Exclude Playwright E2E tests from Vitest
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/tests/e2e/**",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+    ],
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+    ],
   },
 });

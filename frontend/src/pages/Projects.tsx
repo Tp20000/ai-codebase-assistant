@@ -247,10 +247,10 @@ interface ProjectCardProps {
 function ProjectCard({ project, onDelete }: ProjectCardProps) {
   const navigate = useNavigate();
 
-  const statusColor: Record<string, string> = {
+  const statusColor: Record<string, "success" | "info" | "danger" | "default"> = {
     completed: "success",
     in_progress: "info",
-    failed: "error",
+    failed: "danger",
     not_started: "default",
   };
 
@@ -307,15 +307,15 @@ function ProjectCard({ project, onDelete }: ProjectCardProps) {
           </p>
 
           <div className="flex flex-wrap gap-1.5 mt-3">
-            <Badge variant="default" size="sm">{project.language}</Badge>
+            <Badge variant="default">{project.language}</Badge>
             <Badge
-              variant={statusColor[project.index_status ?? "not_started"] as "success" | "info" | "error" | "default"}
-              size="sm"
+              variant={statusColor[project.index_status ?? "not_started"] ?? "default"}
+             
             >
               {statusLabel[project.index_status ?? "not_started"]}
             </Badge>
             {project.file_count > 0 && (
-              <Badge variant="default" size="sm">
+              <Badge variant="default">
                 📄 {project.file_count} files
               </Badge>
             )}
@@ -439,10 +439,17 @@ export default function Projects() {
       <div className="flex-1 overflow-auto p-6">
         {/* Error */}
         {isError && (
-          <ErrorBanner
-            message={(error as Error)?.message || "Failed to load projects"}
-            onRetry={refetch}
-          />
+          <div className="mb-4">
+            <ErrorBanner
+              message={(error as Error)?.message || "Failed to load projects"}
+            />
+            <button
+              onClick={() => void refetch()}
+              className="mt-2 px-3 py-1.5 text-xs rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
         {/* Loading */}

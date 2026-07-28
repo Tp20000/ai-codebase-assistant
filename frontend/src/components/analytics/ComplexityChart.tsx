@@ -95,10 +95,15 @@ export function ComplexityChart({
               fontSize: 12,
               color: "#e6edf3",
             }}
-            formatter={((value: unknown, _: unknown, props: { payload?: { fullPath: string; grade: string } }) => [
-              `${value} (Grade ${props.payload.grade})`,
-              labels[metric],
-            ]) as never}
+            formatter={
+              // Recharts formatter - using any to bypass overly strict generic types
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((value: unknown, _: unknown, item: any) => [
+                `${value} (Grade ${item?.payload?.grade ?? "N/A"})`,
+                labels[metric],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ]) as any
+            }
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
             {chartData.map((entry, index) => (

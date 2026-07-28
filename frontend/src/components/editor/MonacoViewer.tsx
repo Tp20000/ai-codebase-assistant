@@ -139,7 +139,8 @@ export function MonacoViewer({
   className,
 }: MonacoViewerProps) {
   const { theme } = useUIStore();
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,7 +155,8 @@ export function MonacoViewer({
     const monaco = monacoRef.current;
     if (!editor || !monaco || highlights.length === 0) return;
 
-    const newDecorations: editor.IModelDeltaDecoration[] = highlights.map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const newDecorations: any[] = highlights.map(
       (h) => {
         const color = HIGHLIGHT_COLORS[h.type ?? "info"];
         return {
@@ -223,7 +225,7 @@ export function MonacoViewer({
 
       // Click handler for line numbers
       if (onLineClick) {
-        editor.onMouseDown((e: unknown) => {
+        editor.onMouseDown((e: any) => {
           const line = e.target.position?.lineNumber;
           if (line) onLineClick(line);
         });

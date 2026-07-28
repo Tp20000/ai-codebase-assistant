@@ -1,0 +1,42 @@
+# AI Codebase Assistant v2.0 — Git line ending normalization
+
+# Default: normalize all text files to LF in repo
+* text=auto eol=lf
+
+# Force LF for these file types (Linux/Docker compatibility)
+*.py    text eol=lf
+*.sh    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.css   text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.env   text eol=lf
+*.conf  text eol=lf
+*.ini   text eol=lf
+*.toml  text eol=lf
+Dockerfile* text eol=lf
+
+# Keep CRLF for Windows scripts
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Binary files — do not touch
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.zip   binary
+*.gz    binary
+*.pem   binary
+*.sqlite3 binary

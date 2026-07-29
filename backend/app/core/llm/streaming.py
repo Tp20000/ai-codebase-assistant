@@ -155,8 +155,16 @@ class OllamaStreamingClient:
                     system_prompt=system_prompt,
                 )
             elif self.groq_api_key:
+                # Sanitize messages - Groq requires non-empty content
+                clean_messages = [
+                    {"role": m.get("role", "user"), "content": str(m.get("content", "")).strip()}
+                    for m in messages
+                    if m.get("content", "").strip()
+                ]
+                if not clean_messages:
+                    clean_messages = [{"role": "user", "content": prompt or "Hello"}]
                 full_text = await self._generate_groq(
-                    messages=messages,
+                    messages=clean_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
@@ -329,11 +337,14 @@ class OllamaStreamingClient:
             "Authorization": f"Bearer {self.groq_api_key}",
             "Content-Type": "application/json",
         }
+        # Groq limits: max 8192 tokens for llama3-8b-8192
+        # Cap max_tokens to safe value
+        safe_max_tokens = min(max_tokens, 4096)
         payload = {
             "model": self.groq_model,
             "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
+            "temperature": min(max(temperature, 0.0), 1.0),
+            "max_tokens": safe_max_tokens,
         }
         async with httpx.AsyncClient(timeout=60.0) as client:
             r = await client.post(
@@ -341,8 +352,13 @@ class OllamaStreamingClient:
                 json=payload,
                 headers=headers,
             )
+            if r.status_code == 400:
+                error_body = r.text
+                logger.error("Groq 400 error: %s | payload: %s", error_body, payload)
+                raise ValueError(f"Groq API error: {error_body}")
             r.raise_for_status()
-            return str(r.json()["choices"][0]["message"]["content"])
+            data = r.json()
+            return str(data["choices"][0]["message"]["content"])
 
     async def _stream_groq(
         self,

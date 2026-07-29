@@ -1,6 +1,5 @@
 # ================================================================
 # Production Dockerfile — AI Codebase Assistant Backend
-# Compatible with Render.com, Railway, Fly.io, any Docker host
 # ================================================================
 
 FROM python:3.11-slim AS builder
@@ -27,14 +26,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends libpq5 curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder
 COPY --from=builder /install /usr/local
-
-# Copy app source
 COPY . /app/
 
-# Create required directories
-RUN mkdir -p /app/uploads /app/chroma_data /app/logs /app/alembic/versions && \
+RUN mkdir -p /app/uploads /app/chroma_data /app/logs && \
     chown -R appuser:appuser /app
 
 USER appuser
@@ -52,4 +47,5 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-CMD ["sh", "-c", "alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# Use create_tables.py instead of alembic to avoid migration conflicts
+CMD ["sh", "-c", "python /app/create_tables.py && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

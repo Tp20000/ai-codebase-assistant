@@ -232,3 +232,9 @@ class LLMService:
 
 # Singleton
 llm_service = LLMService()
+
+# ── Backward compatibility aliases ───────────────────────────────────────────
+# These names are used by existing imports throughout the codebase
+OllamaService = LLMService
+ollama_service = llm_service
+get_llm_service = lambda: llm_service

@@ -67,7 +67,7 @@ AI Codebase Assistant is a full-stack web application that lets developers uploa
 
 | Profile & Model Settings | Theme & API Configuration |
 |--------------------------|--------------------------|
-| ![Settings 1](docs/screenshots/settings1.png) | ![Settings 2](docs/screenshots/settings2.png) |
+| ![Settings 1](docs/screenshots/setting1.png) | ![Settings 2](docs/screenshots/settings2.png) |
 
 ---
 

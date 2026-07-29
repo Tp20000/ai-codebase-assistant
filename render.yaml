@@ -1,0 +1,53 @@
+# render.yaml - Render.com deployment configuration
+# AI Codebase Assistant v2.0
+
+services:
+  # ── Backend API ──────────────────────────────────────────────────
+  - type: web
+    name: ai-codebase-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: PYTHONPATH
+        value: /app
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: CHROMA_PERSIST_DIRECTORY
+        value: /app/chroma_data
+      - key: OLLAMA_BASE_URL
+        value: http://localhost:11434
+      - key: ALGORITHM
+        value: RS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      # Set these manually in Render dashboard:
+      # SECRET_KEY, DATABASE_URL, REDIS_URL, CORS_ORIGINS
+
+  # ── PostgreSQL Database ──────────────────────────────────────────
+  - type: pserv
+    name: ai-codebase-postgres
+    runtime: docker
+    plan: free
+    image:
+      url: docker.io/library/postgres:15-alpine
+    envVars:
+      - key: POSTGRES_USER
+        value: aiassistant
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+      - key: POSTGRES_DB
+        value: ai_codebase_db
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1

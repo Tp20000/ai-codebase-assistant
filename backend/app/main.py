@@ -12,6 +12,9 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.middleware.security import SecurityHeadersMiddleware, RequestIDMiddleware, InputSanitizationMiddleware
+from app.middleware.security_config import get_security_config
 from fastapi.responses import JSONResponse
 
 from app.config import settings
@@ -40,6 +43,8 @@ from app.api.v1.analytics import router as analytics_router
 logger = logging.getLogger(__name__)
 
 
+
+SECURITY_CONFIG = get_security_config()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting AI Codebase Assistant v%s...", settings.VERSION)
@@ -67,53 +72,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=SECURITY_CONFIG["cors"]["allow_origins"],
+    allow_credentials=SECURITY_CONFIG["cors"]["allow_credentials"],
+    allow_methods=SECURITY_CONFIG["cors"]["allow_methods"],
+    allow_headers=SECURITY_CONFIG["cors"]["allow_headers"],
+    expose_headers=SECURITY_CONFIG["cors"]["expose_headers"],
+    max_age=SECURITY_CONFIG["cors"]["max_age"],
 )
-
-
-@app.middleware("http")
-async def add_timing(request: Request, call_next):
-    start = time.perf_counter()
-    response = await call_next(request)
-    response.headers["X-Process-Time"] = f"{(time.perf_counter()-start)*1000:.2f}ms"
-    return response
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled: %s %s", request.url, exc, exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "type": type(exc).__name__},
-    )
-
-
-PREFIX = settings.API_V1_PREFIX
-
-app.include_router(health_router,        prefix=PREFIX)
-app.include_router(auth_router,          prefix=PREFIX)
-app.include_router(projects_router,      prefix=PREFIX)
-app.include_router(files_router,         prefix=PREFIX)
-app.include_router(llm_router,           prefix=PREFIX)
-app.include_router(chat_router,          prefix=PREFIX)
-app.include_router(prompts_router,       prefix=PREFIX)
-app.include_router(websocket_router,     prefix=PREFIX)
-app.include_router(history_router,       prefix=PREFIX)
-app.include_router(cache_router,         prefix=PREFIX)
-app.include_router(parser_router,        prefix=PREFIX)
-app.include_router(agents_router,        prefix=PREFIX)
-app.include_router(tasks_router,         prefix=PREFIX)
-app.include_router(indexing_router,      prefix=PREFIX)
-app.include_router(progress_ws_router,   prefix=PREFIX)
-app.include_router(notifications_router, prefix=PREFIX)
-app.include_router(analytics_router,     prefix=PREFIX)
-app.include_router(admin_router,         prefix=PREFIX)
-
-
-@app.get("/", tags=["Root"])
 async def root() -> dict:
     """Root endpoint - API info."""
     return {

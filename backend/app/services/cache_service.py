@@ -62,8 +62,6 @@ class CacheService:
                     redis_url,
                     socket_connect_timeout=10,
                     socket_timeout=10,
-                    ssl=True,
-                    ssl_cert_reqs=None,
                     decode_responses=True,
                 )
             elif redis_url.startswith("redis://") or redis_url.startswith("unix://"):

@@ -91,7 +91,7 @@ class OllamaStreamingClient:
         self.default_model = model
         self.timeout = timeout_seconds
         self.groq_api_key = os.getenv("GROQ_API_KEY", "")
-        self.groq_model = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+        self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
         self.groq_url = "https://api.groq.com/openai/v1"
         self._ollama_ok: Optional[bool] = None
 

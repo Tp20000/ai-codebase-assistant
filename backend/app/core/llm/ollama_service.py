@@ -27,7 +27,7 @@ class LLMService:
         self.groq_api_key = os.getenv("GROQ_API_KEY", "")
         self.groq_url = "https://api.groq.com/openai/v1"
         self.default_model = os.getenv("DEFAULT_MODEL", "llama3.2")
-        self.groq_model = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+        self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
         self._ollama_available: Optional[bool] = None
 
     async def _check_ollama(self) -> bool:

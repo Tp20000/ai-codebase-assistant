@@ -79,7 +79,12 @@ export async function deleteProject(projectId: string): Promise<void> {
 }
 
 export async function fetchHealth(): Promise<Record<string, unknown>> {
-  return apiGet<Record<string, unknown>>("/health");
+  // Health is at root /health, not /api/v1/health
+  const { apiClient } = await import("@/services/api");
+  const baseUrl = import.meta.env.VITE_API_URL as string ?? "";
+  const healthUrl = baseUrl ? `${baseUrl}/health` : "/health";
+  const r = await apiClient.get(healthUrl, { baseURL: "" });
+  return r.data as Record<string, unknown>;
 }
 
 export function getLanguageIcon(language: string): string {

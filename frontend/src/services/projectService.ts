@@ -2,8 +2,7 @@
  * Project API Service - AI Codebase Assistant v2.0
  */
 
-import axios from "axios";
-import { apiGet, apiPost, apiClient } from "@/services/api";
+import { apiGet, apiPost, apiDelete, apiClient } from "@/services/api";
 import { STORAGE_KEYS } from "@/utils/constants";
 
 export interface Project {
@@ -57,39 +56,48 @@ export async function createProject(
 
 /**
  * Delete a project by ID.
- * Uses direct backend URL to bypass Vite proxy trailing slash bug.
- * In production, uses the normal API client.
+ *
+ * Strategy:
+ * - Local dev (port 5173): Vite proxy adds trailing slash → call backend directly
+ * - Production (Vercel): api.ts base URL already points to Render → use apiDelete
  */
 export async function deleteProject(projectId: string): Promise<void> {
-  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  const headers = { Authorization: `Bearer ${token ?? ""}` };
-
-  // Detect if running in local dev (Vite proxy) or production
   const isDev = window.location.port === "5173";
 
   if (isDev) {
-    // Bypass Vite proxy — call backend directly on port 8000
+    // Bypass Vite proxy to avoid trailing slash bug
+    const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const { default: axios } = await import("axios");
     await axios.delete(
       `http://localhost:8000/api/v1/projects/${projectId}`,
-      { headers }
+      { headers: { Authorization: `Bearer ${token ?? ""}` } }
     );
   } else {
-    // Production — use normal API client
-    await apiClient.delete(`/projects/${projectId}`);
+    // Production: use standard apiClient (no trailing slash issue)
+    await apiDelete<void>(`/projects/${projectId}`);
   }
 }
 
 export async function fetchHealth(): Promise<Record<string, unknown>> {
-  const raw = await apiGet<Record<string, unknown>>("/health");
-  return raw;
+  return apiGet<Record<string, unknown>>("/health");
 }
 
 export function getLanguageIcon(language: string): string {
   const icons: Record<string, string> = {
-    python: "🐍", javascript: "🟨", typescript: "🔷",
-    java: "☕", go: "🐹", rust: "🦀", cpp: "⚡",
-    csharp: "🟣", ruby: "💎", php: "🐘", swift: "🧡",
-    kotlin: "🎯", mixed: "🔀", unknown: "📄",
+    python: "🐍",
+    javascript: "🟨",
+    typescript: "🔷",
+    java: "☕",
+    go: "🐹",
+    rust: "🦀",
+    cpp: "⚡",
+    csharp: "🟣",
+    ruby: "💎",
+    php: "🐘",
+    swift: "🧡",
+    kotlin: "🎯",
+    mixed: "🔀",
+    unknown: "📄",
   };
   return icons[language?.toLowerCase()] ?? "📄";
 }
@@ -102,10 +110,15 @@ export function formatRelativeTime(dateStr: string): string {
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffMins < 1)   return "just now";
-    if (diffMins < 60)  return `${diffMins}m ago`;
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7)   return `${diffDays}d ago`;
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  } catch { return dateStr; }
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
 }

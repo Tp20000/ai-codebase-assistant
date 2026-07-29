@@ -1,61 +1,90 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-export default defineConfig({
-  plugins: [
-    react({ jsxRuntime: "automatic" }),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  void env;
+
+  return {
+    plugins: [
+      react({ jsxRuntime: "automatic" }),
+    ],
+
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
     },
-  },
-  server: {
-    port: 5173,
-    host: "0.0.0.0",
-    proxy: {
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: false,
-        configure: (proxy, _options) => {
-          proxy.on("proxyReq", (proxyReq, req, _res) => {
-            // Vite proxy sometimes adds trailing slash — strip it
-            // FastAPI has redirect_slashes=False so /projects/id/ = 404
-            const original = proxyReq.path;
-            // Only strip if last segment looks like an ID (UUID or number)
-            // Keep trailing slash for collection endpoints like /projects/
-            const segments = original.split("?")[0].split("/").filter(Boolean);
-            const last = segments[segments.length - 1] ?? "";
-            const isId =
-              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last) ||
-              /^\d+$/.test(last);
-            if (isId && original.includes("?")) {
-              proxyReq.path = original.replace(/\/\?/, "?");
-            } else if (isId && original.endsWith("/")) {
-              proxyReq.path = original.slice(0, -1);
-            }
-            if (proxyReq.path !== original) {
-              console.log(`[proxy] ${original} -> ${proxyReq.path}`);
-            }
-          });
+
+    server: {
+      port: 5173,
+      host: "0.0.0.0",
+      proxy: {
+        "/api": {
+          target: "http://localhost:8000",
+          changeOrigin: true,
+          secure: false,
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq) => {
+              const url = proxyReq.path;
+              const segments = url.split("?")[0].split("/").filter(Boolean);
+              const last = segments[segments.length - 1] ?? "";
+              const isId =
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(last) ||
+                /^\d+$/.test(last);
+              if (isId && url.endsWith("/")) {
+                proxyReq.path = url.slice(0, -1);
+              }
+            });
+          },
+        },
+        "/ws": {
+          target: "ws://localhost:8000",
+          changeOrigin: true,
+          ws: true,
         },
       },
-      "/ws": {
-        target: "ws://localhost:8000",
-        changeOrigin: true,
-        ws: true,
+    },
+
+    build: {
+      outDir: "dist",
+      sourcemap: false,
+      minify: "esbuild",
+      chunkSizeWarningLimit: 3000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("react-dom") || id.includes("react-router")) {
+                return "vendor-react";
+              }
+              if (id.includes("framer-motion")) {
+                return "vendor-motion";
+              }
+              if (id.includes("@tanstack") || id.includes("zustand")) {
+                return "vendor-state";
+              }
+              if (id.includes("recharts") || id.includes("d3-")) {
+                return "vendor-charts";
+              }
+              if (id.includes("@monaco-editor") || id.includes("monaco-editor")) {
+                return "vendor-monaco";
+              }
+              if (id.includes("reactflow") || id.includes("@xyflow")) {
+                return "vendor-flow";
+              }
+              return "vendor";
+            }
+          },
+        },
       },
     },
-  },
-  build: {
-    outDir: "dist",
-    sourcemap: false,
-  },
-  test: {
-    globals: true,
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-  },
+
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: ["./src/test/setup.ts"],
+    },
+  };
 });

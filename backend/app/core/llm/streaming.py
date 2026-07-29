@@ -1,20 +1,18 @@
-﻿"""
-Streaming response handler for LLM outputs.
+"""
+LLM Streaming Client — supports Ollama (local) and Groq API (production).
+AI Codebase Assistant v2.0
 
-Handles real-time token streaming from Ollama over HTTP,
-formats chunks for WebSocket delivery, and provides both
-synchronous and async iteration interfaces.
+Automatically falls back to Groq when Ollama is unavailable.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import os
 import time
-from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 import httpx
 
@@ -23,305 +21,336 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class StreamChunk:
-    """A single token chunk from the LLM streaming response."""
-
-    token: str
-    is_final: bool = False
+    """A single streamed token from the LLM."""
+    text: str = ""
+    done: bool = False
     model: str = ""
-    elapsed_ms: float = 0.0
-    total_tokens: int = 0
+    error: Optional[str] = None
 
 
 @dataclass
 class StreamingResult:
-    """Final result after collecting all streaming chunks."""
+    """Complete result after streaming finishes."""
+    full_text: str = ""
+    model: str = ""
+    tokens_generated: int = 0
+    elapsed_ms: float = 0.0
+    llm_elapsed_ms: float = 0.0
+    retrieval_elapsed_ms: float = 0.0
+    error: Optional[str] = None
+    chunks: list[StreamChunk] = field(default_factory=list)
 
-    full_text: str
-    model: str
-    total_tokens: int
-    elapsed_ms: float
-    chunks_received: int
-    tokens_per_second: float = field(init=False)
-
-    def __post_init__(self) -> None:
-        """Calculate tokens per second after initialization."""
-        elapsed_sec = self.elapsed_ms / 1000.0
-        self.tokens_per_second = (
-            self.total_tokens / elapsed_sec if elapsed_sec > 0 else 0.0
-        )
-
-    def to_dict(self) -> dict:
-        """Serialize to dictionary for API responses."""
-        return {
-            "full_text": self.full_text,
-            "model": self.model,
-            "total_tokens": self.total_tokens,
-            "elapsed_ms": round(self.elapsed_ms, 2),
-            "tokens_per_second": round(self.tokens_per_second, 2),
-            "chunks_received": self.chunks_received,
-        }
+    @property
+    def success(self) -> bool:
+        return self.error is None and bool(self.full_text)
 
 
 class OllamaStreamingClient:
     """
-    Async streaming client for Ollama's chat completion API.
+    Streaming LLM client with automatic Groq fallback.
 
-    Connects to Ollama's /api/chat endpoint and streams tokens
-    as they are generated, enabling real-time UI updates.
+    Priority:
+    1. Ollama (local dev) — full streaming
+    2. Groq API (production) — streaming via SSE
+    3. Error message — if neither available
     """
 
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
+        model: str = "llama3.2",
         timeout_seconds: float = 120.0,
     ) -> None:
-        """
-        Initialize the streaming client.
+        self.base_url = base_url.rstrip("/")
+        self.default_model = model
+        self.timeout = timeout_seconds
+        self.groq_api_key = os.getenv("GROQ_API_KEY", "")
+        self.groq_model = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+        self.groq_url = "https://api.groq.com/openai/v1"
+        self._ollama_ok: Optional[bool] = None
 
-        Args:
-            base_url: Ollama server URL
-            timeout_seconds: Max time to wait for complete response
-        """
-        self._base_url = base_url.rstrip("/")
-        self._timeout = timeout_seconds
-        logger.info("OllamaStreamingClient initialized: %s", self._base_url)
+    async def _check_ollama(self) -> bool:
+        """Check if Ollama is reachable (cached per instance)."""
+        if self._ollama_ok is not None:
+            return self._ollama_ok
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                r = await client.get(f"{self.base_url}/api/tags")
+                self._ollama_ok = r.status_code == 200
+        except Exception:
+            self._ollama_ok = False
+        logger.info(
+            "Ollama available: %s | Groq available: %s",
+            self._ollama_ok,
+            bool(self.groq_api_key),
+        )
+        return self._ollama_ok
 
-    async def stream_chat(
+    # ── Public streaming API ──────────────────────────────────────────────────
+
+    async def stream(
         self,
-        model: str,
-        messages: list[dict[str, str]],
-        temperature: float = 0.1,
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
         max_tokens: int = 2048,
+        system_prompt: Optional[str] = None,
     ) -> AsyncGenerator[StreamChunk, None]:
-        """
-        Stream chat completion tokens from Ollama.
+        """Stream tokens from the best available backend."""
+        use_model = model or self.default_model
 
-        Args:
-            model: Ollama model name (e.g., "llama3.2", "codellama")
-            messages: Chat messages in OpenAI format
-            temperature: Sampling temperature (0.0-1.0)
-            max_tokens: Maximum tokens to generate
+        if await self._check_ollama():
+            async for chunk in self._stream_ollama(
+                prompt, use_model, temperature, max_tokens, system_prompt
+            ):
+                yield chunk
+        elif self.groq_api_key:
+            async for chunk in self._stream_groq(
+                prompt, temperature, max_tokens, system_prompt
+            ):
+                yield chunk
+        else:
+            yield StreamChunk(
+                text=(
+                    "AI service unavailable in production. "
+                    "Please add GROQ_API_KEY to your Render environment variables. "
+                    "Get a free key at: https://console.groq.com"
+                ),
+                done=True,
+                error="no_llm_backend",
+            )
 
-        Yields:
-            StreamChunk objects as tokens are generated
+    async def generate(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        system_prompt: Optional[str] = None,
+    ) -> StreamingResult:
+        """Generate a complete response (non-streaming)."""
+        start = time.perf_counter()
+        use_model = model or self.default_model
+        full_text = ""
+        error = None
 
-        Raises:
-            ConnectionError: If Ollama is not reachable
-            RuntimeError: If the model is not available
-        """
-        url = f"{self._base_url}/api/chat"
-        payload = {
+        try:
+            if await self._check_ollama():
+                full_text = await self._generate_ollama(
+                    prompt, use_model, temperature, max_tokens
+                )
+            elif self.groq_api_key:
+                full_text = await self._generate_groq(
+                    prompt, temperature, max_tokens, system_prompt
+                )
+            else:
+                full_text = (
+                    "AI service unavailable. "
+                    "Add GROQ_API_KEY to Render environment to enable AI features."
+                )
+                error = "no_llm_backend"
+        except Exception as exc:
+            logger.error("LLM generation error: %s", exc)
+            full_text = f"AI generation failed: {exc}"
+            error = str(exc)
+
+        elapsed = (time.perf_counter() - start) * 1000
+        return StreamingResult(
+            full_text=full_text,
+            model=use_model if await self._check_ollama() else self.groq_model,
+            tokens_generated=len(full_text.split()),
+            elapsed_ms=elapsed,
+            llm_elapsed_ms=elapsed,
+            error=error,
+        )
+
+    # ── Ollama backend ────────────────────────────────────────────────────────
+
+    async def _stream_ollama(
+        self,
+        prompt: str,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        system_prompt: Optional[str],
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """Stream from local Ollama."""
+        payload: dict = {
             "model": model,
-            "messages": messages,
+            "prompt": prompt,
             "stream": True,
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,
-                "top_p": 0.9,
             },
         }
-
-        start_time = time.perf_counter()
-        chunks_received = 0
-
-        logger.info(
-            "Starting stream: model=%s, messages=%d", model, len(messages)
-        )
+        if system_prompt:
+            payload["system"] = system_prompt
 
         try:
-            async with httpx.AsyncClient(
-                timeout=httpx.Timeout(self._timeout)
-            ) as client:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
                 async with client.stream(
-                    "POST", url, json=payload
-                ) as response:
-                    if response.status_code != 200:
-                        error_text = await response.aread()
-                        raise RuntimeError(
-                            f"Ollama returned {response.status_code}: {error_text.decode()}"
-                        )
-
-                    async for line in response.aiter_lines():
+                    "POST",
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
                         if not line.strip():
                             continue
-
                         try:
                             data = json.loads(line)
+                            token = data.get("response", "")
+                            done = data.get("done", False)
+                            if token:
+                                yield StreamChunk(text=token, done=done, model=model)
+                            if done:
+                                yield StreamChunk(text="", done=True, model=model)
+                                return
                         except json.JSONDecodeError:
-                            logger.warning("Invalid JSON from Ollama: %s", line[:100])
                             continue
+        except Exception as exc:
+            logger.error("Ollama stream error: %s", exc)
+            yield StreamChunk(text="", done=True, error=str(exc))
 
-                        message = data.get("message", {})
-                        token = message.get("content", "")
-                        is_done = data.get("done", False)
-
-                        if token:
-                            chunks_received += 1
-                            elapsed = (time.perf_counter() - start_time) * 1000
-                            yield StreamChunk(
-                                token=token,
-                                is_final=False,
-                                model=model,
-                                elapsed_ms=elapsed,
-                                total_tokens=data.get("eval_count", 0),
-                            )
-
-                        if is_done:
-                            elapsed = (time.perf_counter() - start_time) * 1000
-                            yield StreamChunk(
-                                token="",
-                                is_final=True,
-                                model=model,
-                                elapsed_ms=elapsed,
-                                total_tokens=data.get("eval_count", chunks_received),
-                            )
-                            logger.info(
-                                "Stream complete: %d chunks, %.1fms",
-                                chunks_received,
-                                elapsed,
-                            )
-                            return
-
-        except httpx.ConnectError as exc:
-            logger.error("Cannot connect to Ollama at %s: %s", self._base_url, exc)
-            raise ConnectionError(
-                f"Ollama is not reachable at {self._base_url}. "
-                "Ensure Ollama is running with: ollama serve"
-            ) from exc
-        except httpx.TimeoutException as exc:
-            logger.error("Ollama stream timeout after %.1fs", self._timeout)
-            raise TimeoutError(
-                f"LLM response timed out after {self._timeout}s. "
-                "Try a shorter query or smaller model."
-            ) from exc
-
-    async def collect_stream(
+    async def _generate_ollama(
         self,
+        prompt: str,
         model: str,
-        messages: list[dict[str, str]],
-        temperature: float = 0.1,
-        max_tokens: int = 2048,
-    ) -> StreamingResult:
-        """
-        Collect all streaming chunks into a complete response.
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Non-streaming generate from Ollama."""
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            r = await client.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                    },
+                },
+            )
+            r.raise_for_status()
+            return str(r.json().get("response", ""))
 
-        Use this when you need the full text but still want streaming
-        internally (e.g., for background processing or non-WebSocket paths).
+    # ── Groq backend ──────────────────────────────────────────────────────────
 
-        Args:
-            model: Ollama model name
-            messages: Chat messages
-            temperature: Sampling temperature
-            max_tokens: Max tokens to generate
+    async def _stream_groq(
+        self,
+        prompt: str,
+        temperature: float,
+        max_tokens: int,
+        system_prompt: Optional[str],
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """Stream from Groq API using SSE."""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
-        Returns:
-            Complete StreamingResult with full text and metrics
-        """
-        tokens: list[str] = []
-        final_chunk: Optional[StreamChunk] = None
-
-        async for chunk in self.stream_chat(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        ):
-            if chunk.is_final:
-                final_chunk = chunk
-            else:
-                tokens.append(chunk.token)
-
-        full_text = "".join(tokens)
-        elapsed = final_chunk.elapsed_ms if final_chunk else 0.0
-        total_tokens = final_chunk.total_tokens if final_chunk else len(tokens)
-
-        return StreamingResult(
-            full_text=full_text,
-            model=model,
-            total_tokens=total_tokens,
-            elapsed_ms=elapsed,
-            chunks_received=len(tokens),
-        )
-
-
-class WebSocketStreamBroadcaster:
-    """
-    Broadcasts LLM stream chunks to a WebSocket connection.
-
-    Handles the protocol between the streaming LLM client and
-    the WebSocket endpoint, including error propagation and
-    completion signaling.
-    """
-
-    @staticmethod
-    async def broadcast(
-        websocket: object,
-        stream: AsyncGenerator[StreamChunk, None],
-        message_id: str,
-    ) -> StreamingResult:
-        """
-        Broadcast all stream chunks to a WebSocket client.
-
-        Message protocol:
-            {type: "token", token: str, message_id: str}
-            {type: "done", full_text: str, metrics: dict, message_id: str}
-            {type: "error", message: str, message_id: str}
-
-        Args:
-            websocket: FastAPI WebSocket instance
-            stream: Async generator of StreamChunk objects
-            message_id: Unique ID to correlate streamed messages
-
-        Returns:
-            Complete StreamingResult after stream ends
-        """
-        tokens: list[str] = []
-        final_chunk: Optional[StreamChunk] = None
+        headers = {
+            "Authorization": f"Bearer {self.groq_api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.groq_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
 
         try:
-            async for chunk in stream:
-                if chunk.is_final:
-                    final_chunk = chunk
-                else:
-                    tokens.append(chunk.token)
-                    await websocket.send_json(  # type: ignore[attr-defined]
-                        {
-                            "type": "token",
-                            "token": chunk.token,
-                            "message_id": message_id,
-                        }
-                    )
-
-            full_text = "".join(tokens)
-            result = StreamingResult(
-                full_text=full_text,
-                model=final_chunk.model if final_chunk else "",
-                total_tokens=final_chunk.total_tokens if final_chunk else len(tokens),
-                elapsed_ms=final_chunk.elapsed_ms if final_chunk else 0.0,
-                chunks_received=len(tokens),
-            )
-
-            await websocket.send_json(  # type: ignore[attr-defined]
-                {
-                    "type": "done",
-                    "full_text": full_text,
-                    "message_id": message_id,
-                    "metrics": result.to_dict(),
-                }
-            )
-
-            return result
-
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.groq_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            yield StreamChunk(
+                                text="", done=True, model=self.groq_model
+                            )
+                            return
+                        try:
+                            data = json.loads(data_str)
+                            token = (
+                                data["choices"][0]
+                                .get("delta", {})
+                                .get("content", "")
+                            )
+                            if token:
+                                yield StreamChunk(
+                                    text=token,
+                                    done=False,
+                                    model=self.groq_model,
+                                )
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            continue
         except Exception as exc:
-            logger.error("WebSocket broadcast error: %s", exc)
-            try:
-                await websocket.send_json(  # type: ignore[attr-defined]
-                    {
-                        "type": "error",
-                        "message": str(exc),
-                        "message_id": message_id,
-                    }
-                )
-            except Exception:
-                pass  # WebSocket may already be closed
-            raise
+            logger.error("Groq stream error: %s", exc)
+            yield StreamChunk(text="", done=True, error=str(exc))
+
+    async def _generate_groq(
+        self,
+        prompt: str,
+        temperature: float,
+        max_tokens: int,
+        system_prompt: Optional[str],
+    ) -> str:
+        """Non-streaming generate from Groq API."""
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        headers = {
+            "Authorization": f"Bearer {self.groq_api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.groq_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.post(
+                f"{self.groq_url}/chat/completions",
+                json=payload,
+                headers=headers,
+            )
+            r.raise_for_status()
+            return str(r.json()["choices"][0]["message"]["content"])
+
+    # ── Health check ──────────────────────────────────────────────────────────
+
+    async def health(self) -> dict:
+        """Return health status of all backends."""
+        ollama_ok = await self._check_ollama()
+        return {
+            "ollama": {
+                "available": ollama_ok,
+                "url": self.base_url,
+            },
+            "groq": {
+                "available": bool(self.groq_api_key),
+                "model": self.groq_model,
+            },
+            "active_backend": (
+                "ollama" if ollama_ok
+                else "groq" if self.groq_api_key
+                else "none"
+            ),
+        }
